@@ -1,82 +1,120 @@
-# NeCA: 3D Coronary Artery Tree Reconstruction from Two 2D Projections via Neural Implicit Representation
+# SDF-CAR: 3D Coronary Artery Reconstruction from Two Views with a Hybrid SDF-Occupancy Implicit Representation
 
-# 1. Overview
+[![PyTorch](https://img.shields.io/badge/PyTorch-%23EE4C2C.svg?style=for-the-badge&logo=PyTorch&logoColor=white)](https://pytorch.org/)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
 
-This is the official code repository for the [NeCA](https://www.mdpi.com/2306-5354/11/12/1227) paper by Yiying Wang, Abhirup Banerjee and Vicente Grau, published at Bioengineering (Invited: free of APC).
+**SDF-CAR** is a novel self-supervised framework for reconstructing 3D coronary arteries from only two sparse 2D X-ray projections. By leveraging a **Hybrid SDF-Occupancy** representation, we overcome the "blobby" artifacts and broken connectivity common in pure occupancy networks (like NeCA), achieving state-of-the-art topological accuracy.
 
-## Citation
+<p align="center">
+  <img src="assets/3D_SDF_to_2D.png" alt="SDF-CAR Pipeline" width="100%">
+  <br>
+  <em>Figure 1: Overview of the SDF-CAR Framework.</em>
+</p>
 
-If you find the code useful, please consider citing the paper.
+## 📄 Abstract
 
+The three-dimensional (3D) reconstruction of coronary arteries is crucial for diagnosis but difficult to achieve from standard Invasive Coronary Angiography (ICA) which provides only sparse 2D views. We propose **SDF-CAR**, a self-supervised framework that leverages a **Signed Distance Field (SDF)**-based neural implicit representation. Unlike supervised methods that require unavailable 3D ground truth, SDF-CAR optimizes a patient-specific model directly from 2D projections. By integrating SDF-based geometric priors with an occupancy-based differentiable rendering loss, we improve the **Centerline Dice (cIDice)** score by over **16%** compared to state-of-the-art baselines, ensuring smooth, continuous vessel reconstruction.
+
+## 🏆 Key Features
+
+* **Hybrid Representation:** Combines the optimization stability of Occupancy networks with the geometric surface precision of Signed Distance Functions (SDF).
+* **Sparse View Reconstruction:** Works effectively with only **2 standard angiographic views**.
+* **Topological Preservation:** Significantly reduces broken vessel segments and disconnected branches in distal areas.
+* **Self-Supervised:** No 3D ground truth required for training; optimizes directly on patient projection data.
+
+## 📊 Qualitative Results
+
+### Right Coronary Artery (RCA)
+SDF-CAR maintains connectivity in complex curved segments where baselines often fail.
+
+<p align="center">
+  <img src="assets/RCA_Diagrams.png" alt="RCA Qualitative Results" width="100%">
+</p>
+
+### Left Anterior Descending (LAD)
+Our method successfully captures fine distal branches that are often missed by occupancy-only methods.
+
+<p align="center">
+  <img src="assets/LAD_Diagrams.png" alt="LAD Qualitative Results" width="100%">
+</p>
+
+## 🛠️ Installation
+
+This code is based on PyTorch and requires a GPU with CUDA support.
+
+```bash
+# 1. Clone the repository
+git clone [https://github.com/reda1609/SDF-CAR.git](https://github.com/reda1609/SDF-CAR.git)
+cd SDF-CAR
+
+# 2. Create a conda environment
+conda create -n sdf-car python=3.8
+conda activate sdf-car
+
+# 3. Install PyTorch (Adjust cuda version as needed)
+conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
+
+# 4. Install dependencies
+pip install -r requirements.txt
+
+# 5. (Optional) Install tiny-cuda-nn for hash encoding acceleration
+pip install git+[https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=bindings/torch](https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=bindings/torch)
 ```
-@Article{wang2024neca3dcoronaryartery,
-AUTHOR = {Wang, Yiying and Banerjee, Abhirup and Grau, Vicente},
-TITLE = {NeCA: 3D Coronary Artery Tree Reconstruction from Two 2D Projections via Neural Implicit Representation},
-JOURNAL = {Bioengineering},
-VOLUME = {11},
-YEAR = {2024},
-NUMBER = {12},
-ARTICLE-NUMBER = {1227},
-URL = {https://www.mdpi.com/2306-5354/11/12/1227},
-ISSN = {2306-5354},
-DOI = {10.3390/bioengineering11121227}
+
+## 📂 Data Preparation
+
+We utilize the **ImageCAS** dataset (Coronary Artery Segmentation from CCTA).
+
+1.  Download the ImageCAS dataset.
+2.  Preprocess the data to generate Digital Reconstructed Radiographs (DRRs) for training.
+3.  Organize data as follows:
+
+    ```
+    data/
+    ├── ImageCAS/
+    │   ├── patient_01/
+    │   │   ├── proj_1.png
+    │   │   ├── proj_2.png
+    │   │   └── geometry.json
+    │   └── ...
+    ```
+
+## 🚀 Usage
+
+### Training
+To optimize a model for a specific patient (e.g., Patient 1 RCA):
+
+```bash
+python train.py --config configs/rca.yaml --patient_id 1 --gpu 0
+```
+
+### Evaluation
+To evaluate the reconstruction against Ground Truth (if available for validation):
+
+```bash
+python eval.py --checkpoint experiments/patient_1/best_model.pth --output_dir results/
+```
+
+## 📝 Citation
+
+If you find this code or paper useful for your research, please cite:
+
+```bibtex
+@article{yourname2025sdfcar,
+title={SDF-CAR: 3D Coronary Artery Reconstruction from Two Views with a Hybrid SDF-Occupancy Implicit Representation},
+author={Your Name and Co-Authors},
+journal={Submission Target},
+year={2025}
 }
 ```
 
-# 2. Introduction
+## 🙏 Acknowledgements
 
-Cardiovascular diseases (CVDs) are the most common health threats worldwide. 2D X-ray invasive coronary angiography (ICA) remains the most widely adopted imaging modality for CVD assessment during real-time cardiac interventions. However, it is often difficult for the cardiologists to interpret the 3D geometry of coronary vessels based on 2D planes. Moreover, due to the radiation limit, often only two angiographic projections are acquired, providing limited information of the vessel geometry and necessitating 3D coronary tree reconstruction based only on two ICA projections. In this paper, we propose a self-supervised deep learning method called NeCA, which is based on neural implicit representation using the multiresolution hash encoder and differentiable cone-beam forward projector layer, in order to achieve 3D coronary artery tree reconstruction from two 2D projections. We validate our method using six different metrics on a dataset generated from coronary computed tomography angiography of right coronary artery and left anterior descending artery. The evaluation results demonstrate that our NeCA method, without requiring 3D ground truth for supervision or large datasets for training, achieves promising performance in both vessel topology and branch-connectivity preservation compared to the supervised deep learning model.
+This code heavily builds upon the following excellent repositories:
 
-## Our Proposed Model Architecture
+* [NeCA](https://github.com/SID-CoroRecon/NeCA)
+* [Instant-NGP](https://github.com/NVlabs/instant-ngp)
+* [ImageCAS Dataset](https://github.com/XiaoweiXu/ImageCAS-A-Large-Scale-Dataset-and-Benchmark-for-Coronary-Artery-Segmentation-based-on-CT)
 
-<p align="center">
-  <img src="https://github.com/WangStephen/NeCA/blob/main/img/model.svg">
-</p>
-
-# 3. Packages Requirement
-
-This work requires following dependency packages:
-
-```
-python: 3.8.17
-pytorch: 1.9.0 
-numpy: 1.24.4 
-ninja: 1.11.1
-PyYAML: 6.0
-odl: 1.0.0.dev0
-astra-toolbox: 2.1.0
-tqdm: 4.65.0
-argparse
-```
-
-# 4. Code Instructions
-
-## Data Preparation
-
-Please prepare your projection data in shape `(1, Number of projections, Height, Weight)` and put the data under the `./data/CCTA_test/` folder. We recommend to use [ODL](https://github.com/odlgroup/odl) to generate your simulated projections from 3D coronary tree, which is tested and incorporated in this work.
-
-Then please update the corresponding projection geometry in the file `./data/config.yml`.
-
-## Model Optimisation
-
-Configure your model hyper-parameters in the file `./config/CCTA.yaml`.
-
-Then run the model to start 3D reconstruction optimisation:
-
-```
-python train.py --config ./config/CCTA.yaml
-```
-
-The 3D reconstruction results during iterations are saved under the folder `./logs/`.
-
-# 5. License
-
-Please see [license](https://github.com/WangStephen/NeCA/blob/main/LICENSE).
-
-# 6. Acknowledgement
-
-NeCA model architectures are revised based on [NAF](https://github.com/Ruyi-Zha/naf_cbct) and [NeRP](https://github.com/liyues/NeRP).
-
-Multi-resolution hash encoder is based on [torch-ngp](https://github.com/ashawkey/torch-ngp).
-
-Differentiable cone-beam forward projection layer is based on [ODL](https://github.com/odlgroup/odl) and we also use it to generate our simulated projections to model for optimisation.
+---
+*For questions, please contact [your.email@university.edu].*
