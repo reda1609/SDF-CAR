@@ -59,14 +59,8 @@ class BasicTrainer(Trainer):
         self.use_sdf = train_cfg.get("train", {}).get("use_sdf", True)
         self.sdf_alpha = train_cfg.get("train", {}).get("sdf_alpha", 50.0)
         
-        # Set loss weights based on use_sdf
-        if self.use_sdf:
-            # Use weights from config for SDF mode
-            self.loss_weights = train_cfg.get("train", {}).get("current_loss_weights", [1.0, 1.0])
-        else:
-            # Force projection weight to 1.0 for occupancy mode, disable SDF loss
-            self.loss_weights = [1.0, 0.0]
-            
+        # Load loss weights from config (respect user's settings regardless of use_sdf)
+        self.loss_weights = train_cfg.get("train", {}).get("current_loss_weights", [1.0, 1.0])
         self.projection_weight, self.sdf_loss_weight = self.loss_weights
         
         print(f"SDF Mode: {self.use_sdf}, Alpha: {self.sdf_alpha}")
@@ -119,17 +113,28 @@ class BasicTrainer(Trainer):
             # Main projection loss (occupancy-based)
             projection_loss = self.l2_loss(train_projs, projs.float())
             
-            # Add 2D SDF loss only in SDF mode
+            # Add 2D SDF loss (works for both SDF and occupancy modes)
             sdf_2d_loss = torch.tensor(0.0, device=projs.device, requires_grad=True)
-            if (self.use_sdf and self.sdf_loss_weight > 0 and 
+            if (self.sdf_loss_weight > 0 and 
                 hasattr(data, 'sdf_projs') and data.sdf_projs is not None):
-                from src.render.sdf_utils import sdf_3d_to_occupancy_to_sdf_2d
-                # Use actual detector resolution from config
-                detector_pixel_size = self.dataconfig["dDetector"][0]  # Use first detector resolution
-                pred_sdf_2d, _ = sdf_3d_to_occupancy_to_sdf_2d(
-                    train_output_sdf, self.ct_projector_first, self.ct_projector_second,
-                    alpha=self.sdf_alpha, voxel_size_2d=detector_pixel_size
-                )
+                
+                detector_pixel_size = self.dataconfig["dDetector"][0]
+                
+                if self.use_sdf:
+                    # SDF mode: use existing pipeline (3D SDF -> occupancy -> 2D proj -> 2D SDF)
+                    from src.render.sdf_utils import sdf_3d_to_occupancy_to_sdf_2d
+                    pred_sdf_2d, _ = sdf_3d_to_occupancy_to_sdf_2d(
+                        train_output_sdf, self.ct_projector_first, self.ct_projector_second,
+                        alpha=self.sdf_alpha, voxel_size_2d=detector_pixel_size
+                    )
+                else:
+                    # Occupancy mode: convert 2D occupancy projections to 2D SDF
+                    from src.render.sdf_utils import occupancy_to_sdf_2d
+                    # train_projs is [batch, 2, H, W] containing the occupancy projections
+                    sdf_2d_view1 = occupancy_to_sdf_2d(train_projs[0, 0], voxel_size=detector_pixel_size)
+                    sdf_2d_view2 = occupancy_to_sdf_2d(train_projs[0, 1], voxel_size=detector_pixel_size)
+                    pred_sdf_2d = torch.stack([sdf_2d_view1, sdf_2d_view2], dim=0)[None, ...]  # [1, 2, H, W]
+                
                 sdf_2d_loss = self.l2_loss(pred_sdf_2d, data.sdf_projs.float())
             
             # Combine losses with weights

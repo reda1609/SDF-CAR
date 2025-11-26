@@ -56,11 +56,6 @@ def process_models_on_gpu(rank, model_numbers, config_path):
             
             # Run experiments for each learning rate and loss weight combination
             for exp_idx, (lr, loss_weights) in enumerate([(lr, weights) for lr in lrates for weights in loss_weight_experiments]):
-                # Override weights to [1, 0] if use_sdf is false (occupancy mode)
-                use_sdf = cfg["train"].get("use_sdf", True)
-                if not use_sdf:
-                    loss_weights = [1.0, 0.0]  # Force occupancy mode weights
-                
                 proj_w, sdf_w = loss_weights
                 experiment_name = f"{model_id}_lr{lr}_proj{proj_w}_sdf{sdf_w}"
                 print(f"\n[GPU {rank}] --- Experiment {exp_idx+1}: LR={lr}, Weights=[proj:{proj_w}, sdf:{sdf_w}] ---")

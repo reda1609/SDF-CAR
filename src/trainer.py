@@ -126,18 +126,13 @@ class Trainer:
         # Dataset preparation based on mode
         self.use_sdf = cfg.get("train", {}).get("use_sdf", True)
         
-        # Generate 2D SDF targets only if using SDF mode
-        if self.use_sdf:
-            from src.render.sdf_utils import occupancy_to_sdf_2d
-            proj_sdf_one = occupancy_to_sdf_2d(train_projs_one.squeeze(0).squeeze(0), voxel_size=proj_reso[0])  # [512, 512]
-            proj_sdf_two = occupancy_to_sdf_2d(train_projs_two.squeeze(0).squeeze(0), voxel_size=proj_reso[1])  # [512, 512]
-            data["sdf_projections"] = torch.cat((proj_sdf_one[None, None, :], proj_sdf_two[None, None, :]), 1)  # [1, 2, 512, 512]
-            print(f"Generated 2D SDF targets: {data['sdf_projections'].shape}")
-        else:
-            # Create empty tensor for occupancy mode to avoid None errors
-            proj_shape = train_projs_one.shape
-            data["sdf_projections"] = torch.zeros((1, 2, proj_shape[2], proj_shape[3]), dtype=torch.float32, device=train_projs_one.device)
-            print("Occupancy mode: No SDF targets generated (using dummy tensor)")
+        # Always generate 2D SDF targets from ground truth occupancy projections
+        # (needed for SDF loss computation regardless of use_sdf mode)
+        from src.render.sdf_utils import occupancy_to_sdf_2d
+        proj_sdf_one = occupancy_to_sdf_2d(train_projs_one.squeeze(0).squeeze(0), voxel_size=proj_reso[0])  # [512, 512]
+        proj_sdf_two = occupancy_to_sdf_2d(train_projs_two.squeeze(0).squeeze(0), voxel_size=proj_reso[1])  # [512, 512]
+        data["sdf_projections"] = torch.cat((proj_sdf_one[None, None, :], proj_sdf_two[None, None, :]), 1)  # [1, 2, 512, 512]
+        print(f"Generated 2D SDF targets from GT occupancy projections: {data['sdf_projections'].shape}")
 
         # Dataset
         self.dataconfig = data
@@ -147,14 +142,8 @@ class Trainer:
         # Set last_activation based on use_sdf
         cfg["network"]["use_sdf"] = True if self.use_sdf else False
             
-        # Set loss weights based on use_sdf
-        if self.use_sdf:
-            # Use weights from config for SDF mode
-            self.loss_weights = cfg.get("train", {}).get("current_loss_weights", [1.0, 1.0])
-        else:
-            # Force projection weight to 1.0 for occupancy mode, disable SDF loss
-            self.loss_weights = [1.0, 0.0]
-            
+        # Load loss weights from config (respect user's settings regardless of use_sdf)
+        self.loss_weights = cfg.get("train", {}).get("current_loss_weights", [1.0, 1.0])
         self.projection_weight, self.sdf_loss_weight = self.loss_weights
         
         print(f"SDF Mode: {self.use_sdf}")
@@ -388,40 +377,45 @@ class Trainer:
         np.save(pred_projs_path, pred_projs_data)
         print(f"Saved predicted projections: {pred_projs_path}")
         
-        # Generate and save 2D SDF predictions only in SDF mode
-        if self.use_sdf:
+        # Always save ground truth 2D SDF (generated for all modes now)
+        gt_sdf_2d_filename = f"sdf_2d_gt_{self.current_model_id}.npy"
+        gt_sdf_2d_path = osp.join(self.output_recon_dir, gt_sdf_2d_filename)
+        gt_sdf_2d_data = self.dataconfig["sdf_projections"].detach().cpu().numpy()
+        np.save(gt_sdf_2d_path, gt_sdf_2d_data)
+        print(f"Saved 2D SDF ground truth: {gt_sdf_2d_path}")
+        
+        # Generate and save 2D SDF predictions if model was trained with SDF loss
+        if self.sdf_loss_weight > 0:
             detector_pixel_size = self.dataconfig["dDetector"][0]
-            from src.render.sdf_utils import sdf_3d_to_occupancy_to_sdf_2d
-            pred_sdf_2d, _ = sdf_3d_to_occupancy_to_sdf_2d(
-                sdf_pred_tensor, self.ct_projector_first, self.ct_projector_second,
-                alpha=50.0, voxel_size_2d=detector_pixel_size
-            )
+            
+            if self.use_sdf:
+                # SDF mode: convert 3D SDF to 2D SDF via occupancy
+                from src.render.sdf_utils import sdf_3d_to_occupancy_to_sdf_2d
+                pred_sdf_2d, _ = sdf_3d_to_occupancy_to_sdf_2d(
+                    sdf_pred_tensor, self.ct_projector_first, self.ct_projector_second,
+                    alpha=50.0, voxel_size_2d=detector_pixel_size
+                )
+            else:
+                # Occupancy mode: convert 2D occupancy projections to 2D SDF
+                from src.render.sdf_utils import occupancy_to_sdf_2d
+                sdf_2d_view1 = occupancy_to_sdf_2d(pred_projs[0, 0], voxel_size=detector_pixel_size)
+                sdf_2d_view2 = occupancy_to_sdf_2d(pred_projs[0, 1], voxel_size=detector_pixel_size)
+                pred_sdf_2d = torch.stack([sdf_2d_view1, sdf_2d_view2], dim=0)[None, ...]
             
             pred_sdf_2d_filename = f"sdf_2d_pred_{self.current_model_id}.npy"
             pred_sdf_2d_path = osp.join(self.output_recon_dir, pred_sdf_2d_filename)
             pred_sdf_2d_data = pred_sdf_2d.detach().cpu().numpy()
             np.save(pred_sdf_2d_path, pred_sdf_2d_data)
             print(f"Saved 2D SDF predictions: {pred_sdf_2d_path}")
-            
-            # Save ground truth 2D SDF if in SDF mode
-            if self.use_sdf:
-                gt_sdf_2d_filename = f"sdf_2d_gt_{self.current_model_id}.npy"
-                gt_sdf_2d_path = osp.join(self.output_recon_dir, gt_sdf_2d_filename)
-                gt_sdf_2d_data = self.dataconfig["sdf_projections"].detach().cpu().numpy()
-                np.save(gt_sdf_2d_path, gt_sdf_2d_data)
-                print(f"Saved 2D SDF ground truth: {gt_sdf_2d_path}")
-            else:
-                gt_sdf_2d_data = None
         else:
-            # Occupancy mode: no SDF predictions
+            # No SDF loss used during training
             pred_sdf_2d_data = None
-            gt_sdf_2d_data = None
-            print("Occupancy mode: No 2D SDF predictions generated")
+            print("No SDF loss used - skipping 2D SDF prediction generation")
         
-        # Create comparison images based on mode
+        # Create comparison images based on whether SDF loss was used
         comparison_path = osp.join(self.output_recon_dir, f"comparison_{self.current_model_id}.png")
         
-        if self.use_sdf and pred_sdf_2d_data is not None:
+        if self.sdf_loss_weight > 0 and pred_sdf_2d_data is not None:
             # SDF mode: show both occupancy and SDF projections
             fig, axes = plt.subplots(2, 4, figsize=(16, 8))
             
