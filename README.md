@@ -117,4 +117,4 @@ This code heavily builds upon the following excellent repositories:
 * [ImageCAS Dataset](https://github.com/XiaoweiXu/ImageCAS-A-Large-Scale-Dataset-and-Benchmark-for-Coronary-Artery-Segmentation-based-on-CT)
 
 ---
-*For questions, please contact [your.email@university.edu].*
+*For questions, please contact [es-MohamedA.Hamdy2025@alexu.edu.eg].*
