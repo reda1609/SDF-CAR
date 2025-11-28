@@ -129,8 +129,8 @@ class Trainer:
         # Always generate 2D SDF targets from ground truth occupancy projections
         # (needed for SDF loss computation regardless of use_sdf mode)
         from src.render.sdf_utils import occupancy_to_sdf_2d
-        proj_sdf_one = occupancy_to_sdf_2d(train_projs_one.squeeze(0).squeeze(0), voxel_size=proj_reso[0])  # [512, 512]
-        proj_sdf_two = occupancy_to_sdf_2d(train_projs_two.squeeze(0).squeeze(0), voxel_size=proj_reso[1])  # [512, 512]
+        proj_sdf_one = occupancy_to_sdf_2d(train_projs_one.squeeze(0).squeeze(0), voxel_size=proj_reso[0], use_kornia=False)  # [512, 512]
+        proj_sdf_two = occupancy_to_sdf_2d(train_projs_two.squeeze(0).squeeze(0), voxel_size=proj_reso[1], use_kornia=False)  # [512, 512]
         data["sdf_projections"] = torch.cat((proj_sdf_one[None, None, :], proj_sdf_two[None, None, :]), 1)  # [1, 2, 512, 512]
         print(f"Generated 2D SDF targets from GT occupancy projections: {data['sdf_projections'].shape}")
 
@@ -398,8 +398,8 @@ class Trainer:
             else:
                 # Occupancy mode: convert 2D occupancy projections to 2D SDF
                 from src.render.sdf_utils import occupancy_to_sdf_2d
-                sdf_2d_view1 = occupancy_to_sdf_2d(pred_projs[0, 0], voxel_size=detector_pixel_size)
-                sdf_2d_view2 = occupancy_to_sdf_2d(pred_projs[0, 1], voxel_size=detector_pixel_size)
+                sdf_2d_view1 = occupancy_to_sdf_2d(pred_projs[0, 0], voxel_size=detector_pixel_size, use_kornia=False)
+                sdf_2d_view2 = occupancy_to_sdf_2d(pred_projs[0, 1], voxel_size=detector_pixel_size, use_kornia=False)
                 pred_sdf_2d = torch.stack([sdf_2d_view1, sdf_2d_view2], dim=0)[None, ...]
             
             pred_sdf_2d_filename = f"sdf_2d_pred_{self.current_model_id}.npy"
