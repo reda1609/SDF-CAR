@@ -13,6 +13,8 @@
 
 ## 📄 Abstract
 
+**Note: This paper is currently under review.**
+
 The three-dimensional (3D) reconstruction of coronary arteries is crucial for diagnosis but difficult to achieve from standard Invasive Coronary Angiography (ICA) which provides only sparse 2D views. We propose **SDF-CAR**, a self-supervised framework that leverages a **Signed Distance Field (SDF)**-based neural implicit representation. Unlike supervised methods that require unavailable 3D ground truth, SDF-CAR optimizes a patient-specific model directly from 2D projections. By integrating SDF-based geometric priors with an occupancy-based differentiable rendering loss, we improve the **Centerline Dice (cIDice)** score by over **16%** compared to state-of-the-art baselines, ensuring smooth, continuous vessel reconstruction.
 
 ## 🏆 Key Features
@@ -43,22 +45,22 @@ Our method successfully captures fine distal branches that are often missed by o
 This code is based on PyTorch and requires a GPU with CUDA support.
 
 ```bash
-# 1. Clone the repository
-git clone [https://github.com/reda1609/SDF-CAR.git](https://github.com/reda1609/SDF-CAR.git)
+# 1. Navigate to the project directory
 cd SDF-CAR
 
 # 2. Create a conda environment
 conda create -n sdf-car python=3.8
 conda activate sdf-car
 
-# 3. Install PyTorch (Adjust cuda version as needed)
+# 3. Install PyTorch (Adjust CUDA version as needed)
 conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
 
-# 4. Install dependencies
-pip install -r requirements.txt
+# 4. Install required dependencies
+pip install numpy scipy pyyaml tqdm matplotlib pandas
+pip install odl tigre
 
 # 5. (Optional) Install tiny-cuda-nn for hash encoding acceleration
-pip install git+[https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=bindings/torch](https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=bindings/torch)
+pip install git+https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=bindings/torch
 ```
 
 ## 📂 Data Preparation
@@ -66,47 +68,61 @@ pip install git+[https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=bindings/t
 We utilize the **ImageCAS** dataset (Coronary Artery Segmentation from CCTA).
 
 1.  Download the ImageCAS dataset.
-2.  Preprocess the data to generate Digital Reconstructed Radiographs (DRRs) for training.
+2.  Preprocess the CCTA volumes to extract coronary artery segmentations.
 3.  Organize data as follows:
 
     ```
     data/
-    ├── ImageCAS/
-    │   ├── patient_01/
-    │   │   ├── proj_1.png
-    │   │   ├── proj_2.png
-    │   │   └── geometry.json
+    ├── LAD_GT/          # Ground truth LAD segmentations
+    │   ├── 900.npy
+    │   ├── 901.npy
     │   └── ...
+    ├── RCA_GT/          # Ground truth RCA segmentations
+    │   ├── 900.npy
+    │   ├── 901.npy
+    │   └── ...
+    └── ...
     ```
+
+4.  Update the configuration file `config/CCTA.yaml` with the correct data paths.
 
 ## 🚀 Usage
 
-### Training
-To optimize a model for a specific patient (e.g., Patient 1 RCA):
+### Single Model Training
+To train on a single model:
 
 ```bash
-python train.py --config configs/rca.yaml --patient_id 1 --gpu 0
+python train.py --config config/CCTA.yaml
 ```
 
-### Evaluation
-To evaluate the reconstruction against Ground Truth (if available for validation):
+### Batch Training
+To train on multiple models automatically:
 
 ```bash
-python eval.py --checkpoint experiments/patient_1/best_model.pth --output_dir results/
+python batch_train.py --config config/CCTA.yaml --num_gpus 1
+```
+
+The training script will automatically process models specified in the `model_numbers` list in the config file.
+
+### Evaluation
+To evaluate reconstructions against ground truth:
+
+```bash
+python eval.py --pred_dir logs/reconstructions/ --gt_dir data/LAD_GT/ --output_dir results/
+```
+
+### Visualization
+To visualize and compare reconstructions:
+
+```bash
+python vis.py
 ```
 
 ## 📝 Citation
 
-If you find this code or paper useful for your research, please cite:
+**Paper Under Review**
 
-```bibtex
-@article{yourname2025sdfcar,
-title={SDF-CAR: 3D Coronary Artery Reconstruction from Two Views with a Hybrid SDF-Occupancy Implicit Representation},
-author={Your Name and Co-Authors},
-journal={Submission Target},
-year={2025}
-}
-```
+Citation information will be updated upon publication acceptance.
 
 ## 🙏 Acknowledgements
 
@@ -117,4 +133,8 @@ This code heavily builds upon the following excellent repositories:
 * [ImageCAS Dataset](https://github.com/XiaoweiXu/ImageCAS-A-Large-Scale-Dataset-and-Benchmark-for-Coronary-Artery-Segmentation-based-on-CT)
 
 ---
-*For questions, please contact [es-MohamedA.Hamdy2025@alexu.edu.eg].*
+For questions, please contact:
+
+[es-AhmedR.Ali2025@alexu.edu.eg]
+
+[es-MohamedA.Hamdy2025@alexu.edu.eg].
