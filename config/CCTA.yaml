@@ -31,5 +31,9 @@ train:
   # SDF-related parameters
   use_sdf: true  # Use SDF representation instead of occupancy
   sdf_alpha: 50.0  # Sharpness parameter for SDF to occupancy conversion
+  # Camera noise parameters for robustness testing
+  camera_noise_enabled: false  # Enable/disable camera extrinsic noise
+  camera_position_noise_std: 0.0  # Position noise std in mm
+  camera_orientation_noise_std: 0.0  # Orientation noise std in degrees
   # Loss weight experiments - [projection_weight, sdf_2d_weight]
   loss_weight_experiments: [[0.5, 1.0]]

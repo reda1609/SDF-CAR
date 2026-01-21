@@ -86,6 +86,21 @@ class Trainer:
    
         first_proj_angle = [-data["first_projection_angle"][1], data["first_projection_angle"][0]]
         second_proj_angle = [-data["second_projection_angle"][1], data["second_projection_angle"][0]]
+        
+        # Apply camera noise if enabled
+        if cfg.get("train", {}).get("camera_noise_enabled", False):
+            pos_noise_std = cfg.get("train", {}).get("camera_position_noise_std", 0.0)
+            ori_noise_std = cfg.get("train", {}).get("camera_orientation_noise_std", 0.0)
+            
+            if pos_noise_std > 0:
+                dso[0] += np.random.normal(0, pos_noise_std)
+                dso[1] += np.random.normal(0, pos_noise_std)
+            
+            if ori_noise_std > 0:
+                first_proj_angle[0] += np.random.normal(0, ori_noise_std)
+                first_proj_angle[1] += np.random.normal(0, ori_noise_std)
+                second_proj_angle[0] += np.random.normal(0, ori_noise_std)
+                second_proj_angle[1] += np.random.normal(0, ori_noise_std)
 
         # First_projection
         from_source_vec= (0,-dso[0],0)
